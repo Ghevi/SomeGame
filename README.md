@@ -4,9 +4,9 @@
 CREDITS 
 *******************************
 
-Font: Zikketica  
-Creator: Zick Type Foundry   
-License: Public Domain  
-Link: [ https://www.fontspace.com/zikketica-font-f11184]( https://www.fontspace.com/zikketica-font-f11184) <br />
+Font: Caliban    
+Creator: schimmel  
+License: Available for Commercial Use  
+Link: [https://font.download/font/caliban](https://font.download/font/caliban)  
 
 *******************************
