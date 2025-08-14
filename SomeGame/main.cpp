@@ -1,23 +1,11 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
-#include "Dimension2D.hpp"
-
-constexpr int windowWidth = 800;
-constexpr int windowHeight = 600;
-
-constexpr float playerRadius = 50.f;
-constexpr float playerSpeed = 200.f;
-constexpr float projectileSpeed = 1000.f;
-
-constexpr float enemySpeed = 300.f;
 
 namespace sf
 {
 	static const sf::Vector2f VectorZero{ 0, 0 };
 }
 
-sf::Clock mainClock;
-sf::Clock projectileSpawningClock;
 
 //struct MovementBase
 //{
@@ -83,13 +71,24 @@ struct Player
 	}
 };
 
-
-
 struct Projectile
 {
 	sf::CircleShape ProjectileShape{};
 	FixedMovement Movement;
 };
+
+
+constexpr int windowWidth = 800;
+constexpr int windowHeight = 600;
+
+constexpr float playerRadius = 50.f;
+constexpr float playerSpeed = 200.f;
+constexpr float projectileSpeed = 1000.f;
+
+constexpr float enemySpeed = 300.f;
+
+sf::Clock mainClock;
+sf::Clock projectileSpawningClock;
 
 int main()
 {
