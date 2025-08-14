@@ -4,6 +4,16 @@
 namespace sf
 {
 	static const sf::Vector2f VectorZero{ 0, 0 };
+
+	class Vector2fExtensions
+	{
+	public:
+		static bool isOutOfBounds(const sf::Vector2f& vector, const sf::Vector2f& bounds)
+		{
+			return vector.x < 0 || vector.x > bounds.x
+				|| vector.y < 0 || vector.y > bounds.y;
+		}
+	};
 }
 
 
@@ -25,7 +35,8 @@ struct FixedMovement
 		: ProjectileShape(projectileShape),
 		TargetPosition(targetPosition),
 		ProjectileMovementSpeed(projectileMovementSpeed)
-	{ }
+	{
+	}
 
 	sf::Vector2f getVector(sf::Time deltaTime) const
 	{
@@ -71,27 +82,46 @@ struct Player
 	}
 };
 
+struct Enemy
+{
+	sf::CircleShape Shape{};
+	int Hp{};
+	bool IsEnemyPathingDown = true;
+
+	Enemy(float radius, sf::Color fillColor, int hp)
+	{
+		Shape = sf::CircleShape{ radius };
+		Shape.setFillColor(fillColor);
+		Hp = hp;
+	}
+};
+
 struct Projectile
 {
 	sf::CircleShape ProjectileShape{};
 	FixedMovement Movement;
 };
 
-
 constexpr int windowWidth = 800;
 constexpr int windowHeight = 600;
+const sf::Vector2f windowSize
+{
+	static_cast<float>(windowWidth),
+	static_cast<float>(windowHeight)
+};
 
 constexpr float playerRadius = 50.f;
 constexpr float playerSpeed = 200.f;
 constexpr float projectileSpeed = 1000.f;
 
 constexpr float enemySpeed = 300.f;
+constexpr int enemyHp = 100;
 
 sf::Clock mainClock;
 sf::Clock projectileSpawningClock;
 
-sf::Clock fpsClock;
-uint16_t fps = 0;
+sf::Clock fpsDrawingClock;
+const sf::Time fpsCalculationInterval = sf::milliseconds(500);
 
 int main()
 {
@@ -105,8 +135,6 @@ int main()
 		sf::State::Windowed,
 		settings);
 
-	std::vector<sf::Shape*> shapes;
-
 	Debugger debugger{ playerRadius / 100 * 10 , sf::Color::Red };
 	Player player{ playerRadius, sf::Color::Blue, debugger };
 
@@ -115,21 +143,17 @@ int main()
 	text.setFillColor(sf::Color::White);
 	text.setPosition(sf::Vector2f{ 10.f, 10.f });
 
-	shapes.push_back(&player.Shape);
-	shapes.push_back(&player.CenterDebugger.Shape);
-
 	std::vector<Projectile> projectiles;
 	sf::CircleShape projectileBlueprint{ 5.f };
 	projectileBlueprint.setFillColor(sf::Color::White);
 	projectileBlueprint.setPosition(player.Shape.getGlobalBounds().getCenter());
 	projectileBlueprint.setOrigin(sf::Vector2f{ 5.f, 5.f });
 
-	sf::CircleShape enemy{ 15.f };
-	enemy.setFillColor(sf::Color::Red);
-	enemy.setPosition(sf::Vector2f{ 400.f, 400.f });
-	bool isEnemyPathingDown = true;
+	//std::vector<Enemy> enemies;
 
-	shapes.push_back(&enemy);
+	Enemy* enemy = new Enemy{ 15.f, sf::Color::Red, enemyHp };
+	enemy->Shape.setPosition(sf::Vector2f{ 400.f, 400.f });
+	//enemies.push_back(enemy);
 
 	while (window.isOpen())
 	{
@@ -141,17 +165,19 @@ int main()
 
 		sf::Time deltaTime = mainClock.restart();
 
-		auto enemyPosition = enemy.getPosition();
-		const auto enemyVelocity = enemySpeed * deltaTime.asSeconds();
-		if (enemyPosition.y + 100 > windowHeight)
-			isEnemyPathingDown = false;
+		if (enemy != nullptr)
+		{
+			auto enemyPosition = enemy->Shape.getPosition();
+			const auto enemyVelocity = enemySpeed * deltaTime.asSeconds();
+			if (enemyPosition.y + 100 > windowHeight)
+				enemy->IsEnemyPathingDown = false;
 
-		if (enemyPosition.y - 100 < 0)
-			isEnemyPathingDown = true;
+			if (enemyPosition.y - 100 < 0)
+				enemy->IsEnemyPathingDown = true;
 
-		const auto enemyMovement = isEnemyPathingDown ? sf::Vector2f{ 0, enemyVelocity }
-		: -sf::Vector2f{ 0, enemyVelocity };
-		enemy.move(enemyMovement);
+			const sf::Vector2f enemyMovement{ 0, enemyVelocity };
+			enemy->Shape.move(enemy->IsEnemyPathingDown ? enemyMovement : -enemyMovement);
+		}
 
 		sf::Vector2f playerMovement = sf::VectorZero;
 		const auto playerVelocity = playerSpeed * deltaTime.asSeconds();
@@ -188,73 +214,78 @@ int main()
 			}
 		}
 
-		enemyPosition = enemy.getPosition();
+		const auto bounds = player.Shape.getGlobalBounds();
+		auto position = player.Shape.getPosition();
+
+		if (position.x + bounds.size.x > windowWidth)
+			position.x = windowWidth - bounds.size.x;
+
+		if (position.y + bounds.size.y > windowHeight)
+			position.y = windowHeight - bounds.size.y;
+
+		if (position.x < 0)
+			position.x = 0;
+
+		if (position.y < 0)
+			position.y = 0;
+
+		player.Shape.setPosition(position);
+
+		window.clear(sf::Color::Black);
+
+		window.draw(player.Shape);
+		window.draw(player.CenterDebugger.Shape);
+
 		for (auto i = 0; i < projectiles.size(); i++)
 		{
 			auto& projectile = projectiles[i];
 
-			const auto optionalIntersection = enemy
-				.getGlobalBounds()
-				.findIntersection(projectile.ProjectileShape.getGlobalBounds());
-			if (optionalIntersection)
+			if (enemy != nullptr && enemy->Shape.getGlobalBounds()
+				.findIntersection(projectile.ProjectileShape.getGlobalBounds()))
 			{
-				projectiles.erase(projectiles.begin() + i);
-			}
+				enemy->Hp -= 10;
+				std::cout << "Enemy hp: " << enemy->Hp << std::endl;
+				if (enemy->Hp <= 10)
+				{
+					enemy = nullptr;
+				}
 
-			const auto projectilePosition = projectile.ProjectileShape.getPosition();
-			if (projectilePosition.x < 0 || projectilePosition.x > windowWidth
-				|| projectilePosition.y < 0 || projectilePosition.y > windowHeight)
-			{
 				projectiles.erase(projectiles.begin() + i);
-				std::cout << "Removed element, projectiles container size is " << projectiles.size() << std::endl;
 				continue;
 			}
 
-			projectile.ProjectileShape.move(projectile.Movement.getVector(deltaTime));
-		}
+			if (const auto isOutOfBound = sf::Vector2fExtensions::isOutOfBounds(
+				projectile.ProjectileShape.getPosition(), windowSize))
+			{
+				projectiles.erase(projectiles.begin() + i);
+				continue;
+			}
 
-		for (auto shape : shapes)
-		{
-			const auto bounds = shape->getGlobalBounds();
-			auto position = shape->getPosition();
+			projectile.ProjectileShape.move(
+				projectile.Movement.getVector(deltaTime));
 
-			if (position.x + bounds.size.x > windowWidth)
-				position.x = windowWidth - bounds.size.x;
-
-			if (position.y + bounds.size.y > windowHeight)
-				position.y = windowHeight - bounds.size.y;
-
-			if (position.x < 0)
-				position.x = 0;
-
-			if (position.y < 0)
-				position.y = 0;
-
-			shape->setPosition(position);
-		}
-
-		window.clear(sf::Color::Black);
-
-		for (const auto shape : shapes)
-		{
-			window.draw(*shape);
-		}
-
-		for (const auto& projectile : projectiles)
-		{
 			window.draw(projectile.ProjectileShape);
 		}
 
-		if (fpsClock.getElapsedTime().asMilliseconds() >= 1000)
+		if (enemy != nullptr)
 		{
-			text.setString("FPS: " + std::to_string(fps));
-			fps = 0;
-			fpsClock.restart();
+			window.draw(enemy->Shape);
 		}
+
+		/*for (auto& enemy : enemies)
+		{*/
+		//}
+
+		if (fpsDrawingClock.getElapsedTime() >= fpsCalculationInterval)
+		{
+			fpsDrawingClock.restart();
+			float fps = 1.f / deltaTime.asSeconds();
+			text.setString("FPS: " + std::to_string(static_cast<int>(fps)));
+		}
+
 		window.draw(text);
 
 		window.display();
-		fps++;
 	}
 
 	return 0;
