@@ -14,24 +14,24 @@ namespace sf
 
 struct FixedMovement
 {
-private:
-	sf::Vector2f _movement{};
+	sf::CircleShape ProjectileShape{};
+	sf::Vector2f TargetPosition{};
+	float ProjectileMovementSpeed{};
 
-public:
 	FixedMovement(
 		sf::CircleShape projectileShape,
 		sf::Vector2f targetPosition,
 		float projectileMovementSpeed)
-	{
-		auto position = projectileShape.getPosition();
-		auto difference = targetPosition - projectileShape.getPosition();
-		_movement = difference == sf::VectorZero ? sf::VectorZero
-			: sf::Vector2f(projectileMovementSpeed, difference.angle()); // can't calculate angle of VectorZero, throws Assertion failed
-	}
+		: ProjectileShape(projectileShape),
+		TargetPosition(targetPosition),
+		ProjectileMovementSpeed(projectileMovementSpeed)
+	{ }
 
-	sf::Vector2f getVector() const
+	sf::Vector2f getVector(sf::Time deltaTime) const
 	{
-		return _movement;
+		auto difference = TargetPosition - ProjectileShape.getPosition();
+		return difference == sf::VectorZero ? sf::VectorZero
+			: sf::Vector2f(ProjectileMovementSpeed * deltaTime.asSeconds(), difference.angle()); // can't calculate angle of VectorZero, throws Assertion failed
 	}
 };
 
@@ -90,6 +90,9 @@ constexpr float enemySpeed = 300.f;
 sf::Clock mainClock;
 sf::Clock projectileSpawningClock;
 
+sf::Clock fpsClock;
+uint16_t fps = 0;
+
 int main()
 {
 	sf::ContextSettings settings;
@@ -104,8 +107,13 @@ int main()
 
 	std::vector<sf::Shape*> shapes;
 
-	Debugger debugger{ 10.f , sf::Color::Red };
+	Debugger debugger{ playerRadius / 100 * 10 , sf::Color::Red };
 	Player player{ playerRadius, sf::Color::Blue, debugger };
+
+	sf::Font font{ "resources/fonts/Caliban.ttf" };
+	sf::Text text(font, "FPS: ", 20);
+	text.setFillColor(sf::Color::White);
+	text.setPosition(sf::Vector2f{ 10.f, 10.f });
 
 	shapes.push_back(&player.Shape);
 	shapes.push_back(&player.CenterDebugger.Shape);
@@ -171,10 +179,10 @@ int main()
 			{
 				projectileBlueprint,
 				static_cast<sf::Vector2f>(mousePosition),
-				0.5f //projectileSpeed * deltaTime.asSeconds() // not sure why this causes inconsistent speed 
+				projectileSpeed
 			};
 			const Projectile projectile{ projectileBlueprint, projectileMovement };
-			if (projectile.Movement.getVector() != sf::VectorZero)
+			if (projectile.Movement.getVector(deltaTime) != sf::VectorZero)
 			{
 				projectiles.push_back(projectile);
 			}
@@ -202,7 +210,7 @@ int main()
 				continue;
 			}
 
-			projectile.ProjectileShape.move(projectile.Movement.getVector());
+			projectile.ProjectileShape.move(projectile.Movement.getVector(deltaTime));
 		}
 
 		for (auto shape : shapes)
@@ -237,7 +245,16 @@ int main()
 			window.draw(projectile.ProjectileShape);
 		}
 
+		if (fpsClock.getElapsedTime().asMilliseconds() >= 1000)
+		{
+			text.setString("FPS: " + std::to_string(fps));
+			fps = 0;
+			fpsClock.restart();
+		}
+		window.draw(text);
+
 		window.display();
+		fps++;
 	}
 
 	return 0;
