@@ -110,7 +110,7 @@ const sf::Vector2f windowSize
 	static_cast<float>(windowHeight)
 };
 
-constexpr float playerRadius = 50.f;
+constexpr float playerRadius = 32.f;
 constexpr float playerSpeed = 200.f;
 constexpr float projectileSpeed = 1000.f;
 
@@ -138,7 +138,16 @@ int main()
 	Debugger debugger{ playerRadius / 100 * 10 , sf::Color::Red };
 	Player player{ playerRadius, sf::Color::Blue, debugger };
 
-	sf::Font font{ "resources/fonts/Caliban.ttf" };
+	sf::Texture playerTexture;
+	if (playerTexture.loadFromFile("assets/player/textures/spritesheet.png") == false)
+	{
+		std::cout << "Player texture loading failed" << std::endl;
+	}
+	sf::Sprite playerSprite{ playerTexture };
+	playerSprite.setTextureRect(sf::IntRect{ sf::Vector2i{0, 0}, sf::Vector2i{ 64, 64 } });
+
+
+	sf::Font font{ "assets/fonts/Caliban.ttf" };
 	sf::Text text(font, "FPS: ", 20);
 	text.setFillColor(sf::Color::White);
 	text.setPosition(sf::Vector2f{ 10.f, 10.f });
@@ -235,6 +244,7 @@ int main()
 
 		window.draw(player.Shape);
 		window.draw(player.CenterDebugger.Shape);
+		window.draw(playerSprite);
 
 		for (auto i = 0; i < projectiles.size(); i++)
 		{
